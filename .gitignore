@@ -23,3 +23,9 @@ yarn-debug.log*
 yarn-error.log*
 
 .env
+.venv
+venv
+src/App copy.js
+src/App copy 2.js
+src/components/CareerCompass copy.js
+pyscript/temp.py

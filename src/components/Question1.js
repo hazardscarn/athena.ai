@@ -29,8 +29,14 @@ const Question1 = ({ onNext, previousAnswers }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("Submitting form data:", formData);
-    onNext({ q1: formData });  // Wrap formData in an object with key 'q1'
+    const formDataToSubmit = { ...formData };
+    if (e.target.resume.files && e.target.resume.files[0]) {
+      formDataToSubmit.resume = e.target.resume.files[0];
+    } else {
+      delete formDataToSubmit.resume;  // Remove the resume field if no file was uploaded
+    }
+    console.log("Submitting form data:", formDataToSubmit);
+    onNext({ q1: formDataToSubmit });
   };
 
   return (

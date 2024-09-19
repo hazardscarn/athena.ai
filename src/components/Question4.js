@@ -22,6 +22,7 @@ const Question4 = ({ onNext, previousAnswers }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (isValidWordCount) {
+      console.log("Question4 handleSubmit called");
       console.log("Submitting answer for q4:", answer);
       onNext({ q4: answer });
     }

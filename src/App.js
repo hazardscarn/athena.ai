@@ -1,112 +1,213 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence } from 'framer-motion';
 import SignInUp from './components/SignInUp';
 import HomePage from './components/HomePage';
+import CareerCompass from './components/CareerCompass';
 import Question1 from './components/Question1';
 import Question2 from './components/Question2';
 import Question3 from './components/Question3';
 import Question4 from './components/Question4';
 
-
-// Use environment variables to create Supabase client
 const supabase = createClient(
   process.env.REACT_APP_SUPABASE_URL,
   process.env.REACT_APP_SUPABASE_ANON_KEY,
   {
     db: { schema: 'public' },
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    auth: { 
+      persistSession: true, 
+      autoRefreshToken: true, 
+      detectSessionInUrl: true,
+      storage: window.localStorage,
+      debug: true,
+    },
   }
 );
 
+console.log("Supabase client initialized");
+
 const App = () => {
   const [user, setUser] = useState(null);
-  const [userStatus, setUserStatus] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [currentStep, setCurrentStep] = useState('home');
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [planCreationStatus, setPlanCreationStatus] = useState('idle');
+  const [questionnaireCompleted, setQuestionnaireCompleted] = useState(false);
 
-  const fetchUserStatus = useCallback(async (userId) => {
+  const authCheckTimeoutRef = useRef(null);
+  const isInitialMount = useRef(true);
+
+  const resetAppState = useCallback(() => {
+    setUser(null);
+    setCurrentStep('home');
+    setAnswers({});
+    setError(null);
+    setPlanCreationStatus('idle');
+    setQuestionnaireCompleted(false);
+    localStorage.clear();
+    console.log("App state reset and local storage cleared");
+  }, []);
+
+  const checkExistingPlan = useCallback(async (userId) => {
+    console.log("Checking existing plan for user:", userId);
     try {
       const { data, error } = await supabase
-        .from('user_status')
-        .select('status')
+        .from('user_plan_theme')
+        .select('*')
         .eq('user_id', userId)
         .single();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // User status not found, create a new entry
-          await createUserStatus(userId);
+        if (error.code === '406' || error.code === 'PGRST116') {
+          console.log("No existing plan found");
+          setPlanCreationStatus('idle');
         } else {
           throw error;
         }
+      } else if (data) {
+        console.log("Existing plan found:", data);
+        setPlanCreationStatus('completed');
       } else {
-        setUserStatus(data.status);
+        console.log("No existing plan found");
+        setPlanCreationStatus('idle');
       }
     } catch (err) {
-      console.error("Error fetching/setting user status:", err);
-      setError(err.message);
+      console.error("Error checking existing plan:", err);
+      setPlanCreationStatus('idle');
     }
   }, []);
 
-  const createUserStatus = async (userId) => {
+  const checkQuestionnaireStatus = useCallback(async (userId) => {
+    console.log("Checking questionnaire status for user:", userId);
     try {
       const { data, error } = await supabase
-        .from('user_status')
-        .insert({ user_id: userId, status: 0 })
-        .select()
+        .from('user_info')
+        .select('*')
+        .eq('user_id', userId)
         .single();
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') throw error;
 
-      setUserStatus(data.status);
+      if (data) {
+        console.log("User has completed questionnaire");
+        setQuestionnaireCompleted(true);
+        setAnswers(data);
+        await checkExistingPlan(userId);
+      } else {
+        console.log("User has not completed questionnaire");
+        setQuestionnaireCompleted(false);
+        setPlanCreationStatus('idle');
+      }
     } catch (err) {
-      console.error("Error creating user status:", err);
+      console.error("Error checking questionnaire status:", err);
       setError(err.message);
     }
-  };
+  }, [checkExistingPlan]);
+
+  const checkSession = useCallback(async () => {
+    console.log("Starting session check...");
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error("Session check error:", error);
+        throw error;
+      }
+      
+      if (session) {
+        console.log("Session found, user ID:", session.user.id);
+        setUser(session.user);
+        await checkQuestionnaireStatus(session.user.id);
+      } else {
+        console.log("No session found, resetting app state");
+        resetAppState();
+      }
+    } catch (err) {
+      console.error("Error in checkSession:", err);
+      resetAppState();
+      setError(`Session check failed: ${err.message}`);
+    } finally {
+      console.log("Session check completed");
+      setAuthChecked(true);
+      setLoading(false);
+    }
+  }, [resetAppState, checkQuestionnaireStatus]);
 
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        setLoading(true);
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
+    console.log("App component effect running");
+    let isMounted = true;
 
-        if (session) {
-          setUser(session.user);
-          await fetchUserStatus(session.user.id);
-        } else {
-          setUser(null);
-          setUserStatus(null);
+    const initializeApp = async () => {
+      console.log("Initializing app...");
+      try {
+        await checkSession();
+      } catch (error) {
+        console.error("Error during app initialization:", error);
+        if (isMounted) {
+          setError("Failed to initialize app. Please refresh the page.");
         }
-      } catch (err) {
-        console.error("Error checking session:", err);
-        setError(err.message);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          setAuthChecked(true);
+        }
       }
     };
 
-    checkSession();
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      initializeApp();
+
+      authCheckTimeoutRef.current = setTimeout(() => {
+        if (isMounted && loading) {
+          console.log("Authentication check timed out");
+          setLoading(false);
+          setAuthChecked(true);
+          setError("Authentication check timed out. Please refresh the page.");
+        }
+      }, 15000); // 15 seconds timeout
+    }
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        await fetchUserStatus(session.user.id);
-      } else {
-        setUser(null);
-        setUserStatus(null);
+      console.log("Auth state changed:", event);
+      if (event === 'SIGNED_OUT') {
+        if (isMounted) {
+          console.log("User signed out, resetting app state");
+          resetAppState();
+          setAuthChecked(true);
+        }
+      } else if (event === 'SIGNED_IN' && session && !user) {
+        if (isMounted) {
+          console.log("User signed in, ID:", session.user.id);
+          setUser(session.user);
+          await checkQuestionnaireStatus(session.user.id);
+          setAuthChecked(true);
+        }
       }
-      setLoading(false);
     });
 
     return () => {
-      authListener.subscription.unsubscribe();
+      console.log("Cleaning up effect");
+      isMounted = false;
+      clearTimeout(authCheckTimeoutRef.current);
+      if (authListener && authListener.subscription) {
+        authListener.subscription.unsubscribe();
+      }
     };
-  }, [fetchUserStatus]);
+  }, [checkSession, resetAppState, checkQuestionnaireStatus, user]);
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      resetAppState();
+      window.location.href = '/';
+    } catch (err) {
+      console.error("Sign out error:", err);
+      setError(err.message);
+    }
+  };
 
   const startCareerPlanning = () => {
     setCurrentStep('q1');
@@ -114,86 +215,96 @@ const App = () => {
 
   const handleNext = async (stepData) => {
     try {
+      console.log("handleNext called with currentStep:", currentStep);
+      console.log("Received stepData in handleNext:", stepData);
       let newAnswers = { ...answers };
   
-      console.log("Received stepData in handleNext:", stepData);
-  
       if (currentStep === 'q1') {
-        // Extract the q1 data from the stepData
-        const q1Data = stepData.q1;
+        newAnswers.q1 = stepData.q1;
+        if (newAnswers.q1.resume && newAnswers.q1.resume instanceof File) {
+          const file = newAnswers.q1.resume;
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+          const { data, error: uploadError } = await supabase.storage
+            .from('resumes')
+            .upload(fileName, file);
   
-        // Validate required fields
-        const requiredFields = ['age', 'currentField', 'currentPosition', 'gender', 'maritalStatus', 'education', 'workExperience'];
-        for (let field of requiredFields) {
-          if (!q1Data[field] && q1Data[field] !== 0) {
-            throw new Error(`${field} is required`);
+          if (uploadError) {
+            console.error("Resume upload error:", uploadError);
+            throw uploadError;
+          }
+  
+          if (data) {
+            const { data: { publicUrl }, error: urlError } = supabase.storage
+              .from('resumes')
+              .getPublicUrl(fileName);
+  
+            if (urlError) {
+              console.error("Error getting public URL:", urlError);
+              throw urlError;
+            }
+  
+            newAnswers.q1.resumeUrl = publicUrl;
+            console.log("Resume uploaded successfully. Public URL:", publicUrl);
           }
         }
-  
-        // Handle file upload for resume if needed
-        let resumeUrl = null;
-        if (q1Data.resume) {
-          const fileExt = q1Data.resume.name.split('.').pop();
-          const fileName = `${Math.random()}.${fileExt}`;
-          const { error: uploadError } = await supabase.storage
-            .from('resumes')
-            .upload(fileName, q1Data.resume);
-  
-          if (uploadError) throw uploadError;
-  
-          const { data: { publicUrl }, error: urlError } = supabase.storage
-            .from('resumes')
-            .getPublicUrl(fileName);
-  
-          if (urlError) throw urlError;
-  
-          resumeUrl = publicUrl;
-        }
-  
-        newAnswers = {
-          ...newAnswers,
-          user_id: user.id,
-          age: parseInt(q1Data.age),
-          field_of_work: q1Data.currentField,
-          current_position: q1Data.currentPosition,
-          gender: q1Data.gender,
-          marital_status: q1Data.maritalStatus,
-          education: q1Data.education,
-          work_experience: q1Data.workExperience,
-          resume: resumeUrl,
-        };
       } else if (currentStep === 'q2' || currentStep === 'q3' || currentStep === 'q4') {
-        // Check if stepData is an object with the current step as a key
-        const answer = stepData[currentStep] || stepData;
-        
-        if (!answer || typeof answer !== 'string' || answer.trim().length === 0) {
-          throw new Error(`Answer for ${currentStep} is required`);
-        }
-        newAnswers[currentStep] = answer.trim();
+        newAnswers[currentStep] = stepData[currentStep];
       }
   
       setAnswers(newAnswers);
+      console.log("Updated answers:", newAnswers);
   
       const nextStep = currentStep === 'q1' ? 'q2' :
                        currentStep === 'q2' ? 'q3' :
                        currentStep === 'q3' ? 'q4' : 'finished';
   
+      console.log("Calculated next step:", nextStep);
+  
       if (nextStep === 'finished') {
-        const { error: upsertError } = await supabase
+        console.log("Finished all questions, upserting data");
+        const upsertData = {
+          age: parseInt(newAnswers.q1.age, 10),
+          field_of_work: newAnswers.q1.currentField,
+          current_position: newAnswers.q1.currentPosition,
+          gender: newAnswers.q1.gender,
+          marital_status: newAnswers.q1.maritalStatus,
+          education: newAnswers.q1.education,
+          work_experience: newAnswers.q1.workExperience,
+          resume: newAnswers.q1.resumeUrl || null,
+          q2: newAnswers.q2,
+          q3: newAnswers.q3,
+          q4: newAnswers.q4
+        };
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log("Current user:", user);
+        console.log("Upserting data:", upsertData);
+  
+        const { data, error: upsertError } = await supabase
           .from('user_info')
-          .upsert(newAnswers)
+          .upsert(upsertData)
           .select();
   
-        if (upsertError) throw upsertError;
-  
-        await updateUserStatus(1); // Update status to 1 after submitting all info
+        if (upsertError) {
+          console.error("Upsert error:", upsertError);
+          throw upsertError;
+        }
+        
+        if (data) {
+          console.log("Data upserted successfully:", data);
+          setQuestionnaireCompleted(true);
+          setCurrentStep('home');
+        } else {
+          console.error("No data returned from upsert");
+          throw new Error("Failed to upsert data");
+        }
+      } else {
+        setCurrentStep(nextStep);
       }
-  
-      setCurrentStep(nextStep);
-  
     } catch (error) {
       console.error('Error in handleNext:', error);
-      setError(error.message);
+      setError(`An error occurred: ${error.message}`);
     }
   };
 
@@ -204,60 +315,60 @@ const App = () => {
     setCurrentStep(prevStep);
   };
 
-  const handleSignOut = async () => {
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      setUser(null);
-      setUserStatus(null);
-      setCurrentStep('home');
-      setAnswers({});
-    } catch (err) {
-      console.error("Sign out error:", err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateUserStatus = async (newStatus) => {
-    try {
-      const { error } = await supabase
-        .from('user_status')
-        .update({ status: newStatus })
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      
-      setUserStatus(newStatus);
-    } catch (err) {
-      console.error('Error updating user status:', err);
-      setError(err.message);
-    }
-  };
-
   const requestCareerPlan = async () => {
     try {
-      await updateUserStatus(2);
-      alert('Your career plan request has been submitted. We will notify you when it\'s ready.');
+      console.log("Requesting career plan...");
+      setPlanCreationStatus('loading');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/generate_plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      console.log("Career plan request successful");
+      checkPlanStatus();
     } catch (err) {
       console.error("Error requesting career plan:", err);
       setError(err.message);
+      setPlanCreationStatus('error');
+    }
+  };
+  
+  const checkPlanStatus = async () => {
+    try {
+      console.log("Checking plan status...");
+      const { data, error } = await supabase
+        .from('user_plan_theme')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+  
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log("Plan not found, checking again in 10 seconds");
+          setTimeout(checkPlanStatus, 10000);
+        } else {
+          throw error;
+        }
+      } else if (data) {
+        console.log("Plan data found:", data);
+        setPlanCreationStatus('completed');
+      } else {
+        console.log("No error, but no data either. Checking again in 10 seconds");
+        setTimeout(checkPlanStatus, 10000);
+      }
+    } catch (err) {
+      console.error("Error checking plan status:", err);
+      setError(err.message);
     }
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
+  if (!authChecked || loading) {
+    return <div>Loading... Please wait.</div>;
   }
 
   if (error) {
-    return (
-      <div>
-        <p>Error: {error}</p>
-        <button onClick={() => setError(null)}>Dismiss</button>
-      </div>
-    );
+    return <div>Error: {error}</div>;
   }
 
   if (!user) {
@@ -275,7 +386,7 @@ const App = () => {
         Sign Out
       </motion.button>
 
-      {currentStep !== 'home' && currentStep !== 'finished' && (
+      {currentStep !== 'home' && (
         <motion.button
           className="absolute top-4 left-4 bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
           onClick={handleBack}
@@ -286,9 +397,9 @@ const App = () => {
         </motion.button>
       )}
 
-      <div className="max-w-4xl mx-auto mt-16">
+<div className="max-w-4xl mx-auto mt-16">
         <AnimatePresence mode="wait">
-          {userStatus === 0 && currentStep === 'home' && (
+          {currentStep === 'home' && !questionnaireCompleted && (
             <motion.div
               key="home"
               initial={{ opacity: 0, y: 20 }}
@@ -299,7 +410,7 @@ const App = () => {
               <HomePage startCareerPlanning={startCareerPlanning} />
             </motion.div>
           )}
-          {currentStep !== 'home' && currentStep !== 'finished' && (
+          {['q1', 'q2', 'q3', 'q4'].includes(currentStep) && (
             <motion.div
               key={currentStep}
               initial={{ opacity: 0, x: 100 }}
@@ -309,55 +420,17 @@ const App = () => {
               className="bg-white rounded-lg shadow-lg p-8"
             >
               {currentStep === 'q1' && <Question1 onNext={handleNext} previousAnswers={answers} />}
-              {currentStep === 'q2' && <Question2 onNext={handleNext} previousAnswers={answers.q2 || ''} />}
-              {currentStep === 'q3' && <Question3 onNext={handleNext} previousAnswers={answers.q3 || ''} />}
-              {currentStep === 'q4' && <Question4 onNext={handleNext} previousAnswers={answers.q4 || ''} />}
+              {currentStep === 'q2' && <Question2 onNext={handleNext} previousAnswers={answers} />}
+              {currentStep === 'q3' && <Question3 onNext={handleNext} previousAnswers={answers} />}
+              {currentStep === 'q4' && <Question4 onNext={handleNext} previousAnswers={answers} />}
             </motion.div>
           )}
-          {currentStep === 'finished' && (
-            <motion.div
-              key="finished"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
-              className="bg-white rounded-lg shadow-lg p-8 text-center"
-            >
-              <h2 className="text-3xl font-bold mb-6 text-indigo-700">Thank You!</h2>
-              <p className="text-xl text-gray-700">Your career planning information has been submitted successfully.</p>
-            </motion.div>
-          )}
-          {userStatus === 1 && currentStep === 'home' && (
-            <motion.div
-              key="request-plan"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.5 }}
-              className="bg-white rounded-lg shadow-lg p-8 text-center"
-            >
-              <h2 className="text-3xl font-bold mb-6 text-indigo-700">Information Submitted</h2>
-              <p className="text-xl text-gray-700 mb-6">You're ready to request your personalized career plan.</p>
-              <button
-                onClick={requestCareerPlan}
-                className="bg-green-600 text-white px-6 py-3 rounded-lg text-xl hover:bg-green-700 transition-colors"
-              >
-                Request Career Plan
-              </button>
-            </motion.div>
-          )}
-          {userStatus === 2 && currentStep === 'home' && (
-            <motion.div
-              key="view-plan"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.5 }}
-              className="bg-white rounded-lg shadow-lg p-8 text-center"
-            >
-              <h2 className="text-3xl font-bold mb-6 text-indigo-700">Your Career Plan</h2>
-              <p className="text-xl text-gray-700 mb-6">Here's your personalized career plan based on your information.</p>
-              {/* Add more details or components for the career plan view here */}
-            </motion.div>
+          {questionnaireCompleted && currentStep === 'home' && (
+            <CareerCompass
+              userId={user.id}
+              planCreationStatus={planCreationStatus}
+              onRequestPlan={requestCareerPlan}
+            />
           )}
         </AnimatePresence>
       </div>
