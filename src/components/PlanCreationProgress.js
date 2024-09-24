@@ -45,7 +45,7 @@ const PlanCreationProgress = ({ userId }) => {
           if (prevProgress >= 95) {
             return 95; // Cap at 95% until plan is actually ready
           }
-          return prevProgress + 1;
+          return prevProgress + 5;
         });
       }
     }, 3000);
@@ -54,7 +54,7 @@ const PlanCreationProgress = ({ userId }) => {
       if (isMounted) {
         setMessage(getRandomMessage());
       }
-    }, 10000);
+    }, 5000);
 
     checkPlanStatus();
 
@@ -68,9 +68,15 @@ const PlanCreationProgress = ({ userId }) => {
   const getRandomMessage = () => {
     const messages = [
       'Analyzing your career goals...',
-      'Evaluating industry trends...',
+      'Cross referencing your goals to skills...',
+      'Drafting your personalized plan...',
+      'Developing Monthly Themes...',
       'Crafting personalized strategies...',
-      'Finalizing your career roadmap...'
+      'Developing your career roadmap...',
+      'Verifying plan with industry standards...',
+      'Cross Validating plan with career targets...',
+      'Finalizing your career roadmap...',
+      'Saving your career plan...',
     ];
     return messages[Math.floor(Math.random() * messages.length)];
   };

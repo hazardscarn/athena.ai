@@ -38,6 +38,7 @@ const App = () => {
 
   const authCheckTimeoutRef = useRef(null);
   const isInitialMount = useRef(true);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const resetAppState = useCallback(() => {
     setUser(null);
@@ -138,6 +139,7 @@ const App = () => {
   useEffect(() => {
     console.log("App component effect running");
     let isMounted = true;
+    let timeoutId = null;
 
     const initializeApp = async () => {
       console.log("Initializing app...");
@@ -160,8 +162,8 @@ const App = () => {
       isInitialMount.current = false;
       initializeApp();
 
-      authCheckTimeoutRef.current = setTimeout(() => {
-        if (isMounted && loading) {
+      timeoutId = setTimeout(() => {
+        if (isMounted && loading && !isSigningOut) {
           console.log("Authentication check timed out");
           setLoading(false);
           setAuthChecked(true);
@@ -177,6 +179,7 @@ const App = () => {
           console.log("User signed out, resetting app state");
           resetAppState();
           setAuthChecked(true);
+          setLoading(false);
         }
       } else if (event === 'SIGNED_IN' && session && !user) {
         if (isMounted) {
@@ -184,6 +187,7 @@ const App = () => {
           setUser(session.user);
           await checkQuestionnaireStatus(session.user.id);
           setAuthChecked(true);
+          setLoading(false);
         }
       }
     });
@@ -191,21 +195,24 @@ const App = () => {
     return () => {
       console.log("Cleaning up effect");
       isMounted = false;
-      clearTimeout(authCheckTimeoutRef.current);
+      if (timeoutId) clearTimeout(timeoutId);
       if (authListener && authListener.subscription) {
         authListener.subscription.unsubscribe();
       }
     };
-  }, [checkSession, resetAppState, checkQuestionnaireStatus, user]);
+  }, [checkSession, resetAppState, checkQuestionnaireStatus, user, loading, isSigningOut]);
 
   const handleSignOut = async () => {
     try {
+      setIsSigningOut(true);
       await supabase.auth.signOut();
       resetAppState();
-      window.location.href = '/';
+      // Remove the page reload to keep the user in the app
+      setIsSigningOut(false);
     } catch (err) {
       console.error("Sign out error:", err);
       setError(err.message);
+      setIsSigningOut(false);
     }
   };
 

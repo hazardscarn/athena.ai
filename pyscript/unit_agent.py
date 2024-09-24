@@ -1,5 +1,5 @@
 import os
-from typing import TypedDict, Annotated, Sequence, Tuple
+from typing import TypedDict, Annotated, Sequence, Tuple, List, Dict
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 import re
 import pandas as pd
+import sys
 
 # Define the state at module level
 class State(TypedDict):
@@ -32,8 +33,8 @@ class PlanningAgent:
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
         # Initialize the Gemini models
-        self.content_model = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.7)
-        self.json_model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
+        self.content_model = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.7)
+        self.json_model = genai.GenerativeModel('gemini-1.5-flash-001', generation_config={"response_mime_type": "application/json"})
 
         # Define the state
         class State(TypedDict):
@@ -76,35 +77,66 @@ class PlanningAgent:
     Previous Plans: {previous_plans}
 
     Create a plan for month {current_month} that helps the user progress towards their 1-year goal while addressing their 
-    challenges and keeping their ultimate aspiration in mind. The plan should include a theme and 3-5 specific, actionable task outline.
-        
-         - The task outline should be relevant to the user's field of work and career goals.
-         - The task outline should be achievable within the month and should be specific, measurable, and time-bound.
-         - The task outline should be actionable and help the user build skills, knowledge, or experience. It should not be just fancy words.
-         - The task outline should be able to expand to create multiple to do actions for the user to follow which can be tracked and measured.
-         - Make sure the theme and task outlines are following the sequence/continuation of the previous months' plans if any.
-         - Objective is to create step by step plan for the user to follow and achieve their 1-year goal building from last month's plan, so that the user can reach their 1-year goal and ultimate aspiration.
-         - Try to avoid repetitive themes, and the task outline should be actionable.
-         - It is mandatory to have a theme specified for the month. If no theme can be generated for month, generate a them summarizing the task outlines.
-         - "No theme specified" is not a valid theme.
+    challenges and keeping their ultimate aspiration in mind. The plan should include a theme and 3-5 specific, actionable tasks.
 
+    Guidelines that should be followed while creating the plan:
+                 
+        - Tasks must be relevant to the user's field of work, career goals, and the month's theme.
+        - Tasks should be achievable within the month, specific, measurable, and time-bound.
+        - Tasks must be actionable and help the user build skills, knowledge, or experience.
+        - Ensure the theme and tasks follow the sequence/continuation of previous months' plans, if any.
+        - Try to avoid repetitive themes and tasks.
+        - It is mandatory to have a theme specified for the month. If no theme can be generated for month, generate a them summarizing the tasks.
+        - It is mandatory that atleast one of the tasks in a month will be providing new learning or skill development for the user. It could be a course, a book, a project, a certification, etc.
+        - Each task should have an expected time frame for completion (1-4 weeks max).
+        - Do not add more than 1000 words in a single task. Make sure the tasks are under 1000 words each max.
+        - Make sure all the tasks have an expected time frame for completion.
+        - The total tasks for a month should be achievable and not overwhelming.
+        - "No theme specified" is not a valid theme.
 
     Use the following format for plan output:
 
     Theme: [Month's theme]
 
-    Task Outline:
-    1. [Task 1]
-    2. [Task 2]
-    3. [Task 3]
-    4. [Task 4]
-    5. [Task 5] (optional)
+    Tasks:
+    1. **[Task 1 Title]**
+    [Task 1 Description]
+    (Expected time frame: X weeks)
 
-    NOTE: 
-         - Make sure the theme and task outlines are following the sequence/continuation of the previous months' plans if any present.
-         - It is mandatory to have a theme and 3-5 specific, actionable task outline for the month.
-         - The task outline should be actionable and help the user build skills, knowledge, or experience. It should not be just fancy words.
-         - The task outline should be able to expand to create multiple to do actions for the user to follow which can be tracked and measured.    
+    2. **[Task 2 Title]**
+    [Task 2 Description]
+    (Expected time frame: X weeks)
+
+    3. **[Task 3 Title]**
+    [Task 3 Description]
+    (Expected time frame: X weeks)
+
+    4. **[Task 4 Title]** (optional)
+    [Task 4 Description]
+    (Expected time frame: X weeks)
+             
+    Example output:
+
+    Theme: Foundations of Data Science and Machine Learning
+
+    Tasks:
+    1. **Complete Python for Data Science Course**
+    Enroll in and complete the "Python for Data Science" course on Coursera. Focus on data manipulation with Pandas, visualization with Matplotlib, and basic machine learning with Scikit-learn.
+    (Expected time frame: 3 weeks)
+
+    2. **Build a Predictive Model Project**
+    Using a dataset from your current work or a public dataset, build a simple predictive model (e.g., linear regression) to forecast sales or energy consumption. Document your process and results in a Jupyter notebook.
+    (Expected time frame: 2 weeks)
+
+    3. **Read "The Data Science Handbook"**
+    Start reading "The Data Science Handbook" to gain a broader understanding of data science applications in industry. Focus on chapters relevant to retail/utilities.
+    (Expected time frame: 2 weeks)
+
+    4. **Attend Local Data Science Meetup**
+    Research and attend at least one local or virtual data science meetup. Network with professionals and learn about current trends in the field.
+    (Expected time frame: 1 week)
+
+    Ensure that your output follows this format and adheres to all the guidelines provided.
         """),
         ])
 
@@ -129,6 +161,35 @@ class PlanningAgent:
 
         # Compile the graph
         self.app = self.workflow.compile()
+
+
+    # def extract_tasks(content: str) -> List[Dict[str, str]]:
+    #     tasks = []
+    #     task_pattern = re.compile(r'(\d+)\.\s*\*\*(.*?)\*\*\s*(.*?)(?=\n\d+\.\s*\*\*|\Z)', re.DOTALL)
+    #     matches = task_pattern.findall(content)
+        
+    #     for number, title, description in matches:
+    #         task = {
+    #             'number': float(number),
+    #             'content': f"**{title.strip()}** {description.strip()}"
+    #         }
+    #         tasks.append(task)
+        
+    #     return tasks
+    
+    def extract_tasks(self, content: str) -> List[Dict[str, str]]:
+        tasks = []
+        task_pattern = re.compile(r'(\d+)\.\s*\*\*(.*?)\*\*\s*(.*?)\(Expected time frame:\s*(.*?)\)', re.DOTALL)
+        matches = task_pattern.findall(content)
+        
+        for number, title, description, time_frame in matches:
+            task = {
+                'number': float(number),
+                'content': f"**{title.strip()}**\n{description.strip()}\n(Expected time frame: {time_frame.strip()})"
+            }
+            tasks.append(task)
+        
+        return tasks
 
     def plan_month(self, state: State) -> State:
         current_month = state['current_month']
@@ -155,7 +216,7 @@ class PlanningAgent:
         theme_match = re.search(r"Theme:\s*(.*)", content)
         theme = theme_match.group(1).strip() if theme_match else "No theme specified"
         
-        tasks = re.findall(r"\d+\.\s*(.*)", content)
+        tasks = self.extract_tasks(content)
         
         state['plan'][f"month_{current_month}"] = {"theme": theme, "tasks": tasks}
         return state
@@ -187,10 +248,18 @@ class PlanningAgent:
         """
         
         response = self.json_model.generate_content(prompt)
-        result = json.loads(response.text)
         
-        state['check_result'] = result['result']
-        state['check_explanation'] = result['explanation']
+        try:
+            result = json.loads(response.text)
+        except json.JSONDecodeError:
+            print(f"Warning: Failed to parse JSON response. Raw response: {response.text}")
+            result = {
+                "result": True,
+                "explanation": "Unable to parse AI response. Proceeding with the current plan."
+            }
+        
+        state['check_result'] = result.get('result', True)
+        state['check_explanation'] = result.get('explanation', 'No explanation provided.')
         state['current_month'] += 1
         return state
 
@@ -199,8 +268,10 @@ class PlanningAgent:
             return END
         return "planner"
 
+    
+
     def generate_plan(self, user_info: dict, resume_content: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        initial_state = self.State(
+        initial_state = State(
             user_info=user_info,
             resume_content=resume_content,
             current_month=1,
@@ -209,31 +280,27 @@ class PlanningAgent:
 
         print("Starting the career development plan generation...")
         final_state = None
-        for i, output in enumerate(self.app.stream(initial_state)):
-            print(f"\nStream output {i + 1}:")
-            print(json.dumps(output, indent=2))
-            
+        for output in self.app.stream(initial_state):
             if isinstance(output, dict):
-                final_state = output
-                if "plan" in output:
-                    current_month = output['current_month'] - 1  # Adjust for the increment in check_plan
-                    #print(f"\nMonth {current_month} Plan:")
-                    month_plan = output['plan'][f'month_{current_month}']
-                    #print(f"Theme: {month_plan['theme']}")
-                    #print("Tasks:")
-                    # for i, task in enumerate(month_plan['tasks'], 1):
-                    #     print(f"{i}. {task}")
-                # if 'check_result' in output:
-                #     print(f"\nPlan Check Result: {'Passed' if output['check_result'] else 'Failed'}")
-                #     print(f"Explanation: {output['check_explanation']}")
-            else:
-                print(f"Unexpected output type: {type(output)}")
+                if 'planner' in output:
+                    current_month = output['planner']['current_month']
+                    new_month_plan = output['planner']['plan'].get(f'month_{current_month}')
+                    if new_month_plan:
+                        print(f"\nNew plan for Month {current_month}:")
+                        print(f"Theme: {new_month_plan['theme']}")
+                        print("Tasks:")
+                        for task in new_month_plan['tasks']:
+                            print(f"{task['number']}. {task['content'][:100]}...")  # Print first 100 characters of each task
+                elif 'checker' in output:
+                    print(f"\nPlan check result: {'Passed' if output['checker'].get('check_result') else 'Failed'}")
+                    print(f"Explanation: {output['checker'].get('check_explanation', 'No explanation provided.')}")
+            
+            final_state = output
 
-        print("\nStreaming complete. Generating final output...")
+        print("\nPlan generation complete. Preparing final output...")
 
-        # Create DataFrames
         themes_df = pd.DataFrame(columns=[f'month_{i}' for i in range(1, 13)])
-        tasks_df = pd.DataFrame(columns=['month', 'task_outline'])
+        tasks_df = pd.DataFrame(columns=['month', 'task_number', 'task_outline'])
 
         if final_state and 'plan' in final_state:
             plan = final_state['plan']
@@ -243,25 +310,22 @@ class PlanningAgent:
             print("No complete plan was generated.")
             return pd.DataFrame(), pd.DataFrame()
 
-        # Populate DataFrames
         themes = {}
         tasks = []
         for month, month_plan in plan.items():
             month_num = int(month.split('_')[1])
             themes[f'month_{month_num}'] = month_plan['theme']
             for task in month_plan['tasks']:
-                tasks.append({'month': month_num, 'task_outline': task})
+                tasks.append({
+                    'month': month_num,
+                    'task_number': task['number'],
+                    'task_outline': task['content']
+                })
 
         themes_df = pd.DataFrame([themes])
         tasks_df = pd.DataFrame(tasks)
 
-        # Sort tasks by month
         tasks_df = tasks_df.sort_values('month')
-
-        # print("\nThemes DataFrame:")
-        # print(themes_df)
-        # print("\nTasks DataFrame:")
-        # print(tasks_df)
 
         print("\nExecution complete.")
         return themes_df, tasks_df

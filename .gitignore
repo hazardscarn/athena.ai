@@ -28,4 +28,7 @@ venv
 src/App copy.js
 src/App copy 2.js
 src/components/CareerCompass copy.js
+src/components/CareerPlanDisplay copy.js
 pyscript/temp.py
+data
+.tasks_sample.csv
