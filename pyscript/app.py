@@ -18,7 +18,7 @@ from chatbot import CourseRecommendationChatbot
 
 load_dotenv()
 app = Flask(__name__)
-CORS(app)  # This will enable CORS for all routes
+CORS(app, origins=[os.environ.get('REACT_APP_FRONTEND_URL')])
 
 # Initialize the planner agent
 try:
