@@ -8,6 +8,7 @@ import Question1 from './components/Question1';
 import Question2 from './components/Question2';
 import Question3 from './components/Question3';
 import Question4 from './components/Question4';
+import CareerCompassIntro from './components/CareerCompassIntro';
 
 const supabase = createClient(
   process.env.REACT_APP_SUPABASE_URL,
@@ -35,6 +36,7 @@ const App = () => {
   const [error, setError] = useState(null);
   const [planCreationStatus, setPlanCreationStatus] = useState('idle');
   const [questionnaireCompleted, setQuestionnaireCompleted] = useState(false);
+  const [hasSeenIntro, setHasSeenIntro] = useState(false);
 
   const authCheckTimeoutRef = useRef(null);
   const isInitialMount = useRef(true);
@@ -47,6 +49,7 @@ const App = () => {
     setError(null);
     setPlanCreationStatus('idle');
     setQuestionnaireCompleted(false);
+    setHasSeenIntro(false);
     localStorage.clear();
     console.log("App state reset and local storage cleared");
   }, []);
@@ -207,7 +210,6 @@ const App = () => {
       setIsSigningOut(true);
       await supabase.auth.signOut();
       resetAppState();
-      // Remove the page reload to keep the user in the app
       setIsSigningOut(false);
     } catch (err) {
       console.error("Sign out error:", err);
@@ -217,6 +219,11 @@ const App = () => {
   };
 
   const startCareerPlanning = () => {
+    setCurrentStep('q1');
+  };
+
+  const startQuestionnaire = () => {
+    setHasSeenIntro(true);
     setCurrentStep('q1');
   };
 
@@ -293,156 +300,167 @@ const App = () => {
           .upsert(upsertData)
           .select();
   
-        if (upsertError) {
-          console.error("Upsert error:", upsertError);
-          throw upsertError;
-        }
-        
-        if (data) {
-          console.log("Data upserted successfully:", data);
-          setQuestionnaireCompleted(true);
-          setCurrentStep('home');
+          if (upsertError) {
+            console.error("Upsert error:", upsertError);
+            throw upsertError;
+          }
+          
+          if (data) {
+            console.log("Data upserted successfully:", data);
+            setQuestionnaireCompleted(true);
+            setCurrentStep('home');
+          } else {
+            console.error("No data returned from upsert");
+            throw new Error("Failed to upsert data");
+          }
         } else {
-          console.error("No data returned from upsert");
-          throw new Error("Failed to upsert data");
+          setCurrentStep(nextStep);
         }
-      } else {
-        setCurrentStep(nextStep);
+      } catch (error) {
+        console.error('Error in handleNext:', error);
+        setError(`An error occurred: ${error.message}`);
       }
-    } catch (error) {
-      console.error('Error in handleNext:', error);
-      setError(`An error occurred: ${error.message}`);
-    }
-  };
-
-  const handleBack = () => {
-    const prevStep = currentStep === 'q2' ? 'q1' :
-                     currentStep === 'q3' ? 'q2' :
-                     currentStep === 'q4' ? 'q3' : 'home';
-    setCurrentStep(prevStep);
-  };
-
-  const requestCareerPlan = async () => {
-    try {
-      console.log("Requesting career plan...");
-      setPlanCreationStatus('loading');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/generate_plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id }),
-      });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      console.log("Career plan request successful");
-      checkPlanStatus();
-    } catch (err) {
-      console.error("Error requesting career plan:", err);
-      setError(err.message);
-      setPlanCreationStatus('error');
-    }
-  };
+    };
   
-  const checkPlanStatus = async () => {
-    try {
-      console.log("Checking plan status...");
-      const { data, error } = await supabase
-        .from('user_plan_theme')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+    const handleBack = () => {
+      const prevStep = currentStep === 'q2' ? 'q1' :
+                       currentStep === 'q3' ? 'q2' :
+                       currentStep === 'q4' ? 'q3' : 'home';
+      setCurrentStep(prevStep);
+    };
   
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.log("Plan not found, checking again in 10 seconds");
+    const requestCareerPlan = async () => {
+      try {
+        console.log("Requesting career plan...");
+        setPlanCreationStatus('loading');
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/generate_plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: user.id }),
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        console.log("Career plan request successful");
+        checkPlanStatus();
+      } catch (err) {
+        console.error("Error requesting career plan:", err);
+        setError(err.message);
+        setPlanCreationStatus('error');
+      }
+    };
+    
+    const checkPlanStatus = async () => {
+      try {
+        console.log("Checking plan status...");
+        const { data, error } = await supabase
+          .from('user_plan_theme')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+    
+        if (error) {
+          if (error.code === 'PGRST116') {
+            console.log("Plan not found, checking again in 10 seconds");
+            setTimeout(checkPlanStatus, 10000);
+          } else {
+            throw error;
+          }
+        } else if (data) {
+          console.log("Plan data found:", data);
+          setPlanCreationStatus('completed');
+        } else {
+          console.log("No error, but no data either. Checking again in 10 seconds");
           setTimeout(checkPlanStatus, 10000);
-        } else {
-          throw error;
         }
-      } else if (data) {
-        console.log("Plan data found:", data);
-        setPlanCreationStatus('completed');
-      } else {
-        console.log("No error, but no data either. Checking again in 10 seconds");
-        setTimeout(checkPlanStatus, 10000);
+      } catch (err) {
+        console.error("Error checking plan status:", err);
+        setError(err.message);
       }
-    } catch (err) {
-      console.error("Error checking plan status:", err);
-      setError(err.message);
+    };
+  
+    if (!authChecked || loading) {
+      return <div>Loading... Please wait.</div>;
     }
-  };
-
-  if (!authChecked || loading) {
-    return <div>Loading... Please wait.</div>;
-  }
-
-  if (error) {
-    return <div>Error: {error}</div>;
-  }
-
-  if (!user) {
-    return <SignInUp setUser={setUser} />;
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 p-8 relative">
-      <motion.button
-        className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors"
-        onClick={handleSignOut}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-      >
-        Sign Out
-      </motion.button>
-
-      {currentStep !== 'home' && (
+  
+    if (error) {
+      return <div>Error: {error}</div>;
+    }
+  
+    if (!user) {
+      return <SignInUp setUser={setUser} />;
+    }
+  
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 p-8 relative">
         <motion.button
-          className="absolute top-4 left-4 bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
-          onClick={handleBack}
+          className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors"
+          onClick={handleSignOut}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          Back
+          Sign Out
         </motion.button>
-      )}
-
-<div className="max-w-4xl mx-auto mt-16">
-        <AnimatePresence mode="wait">
-          {currentStep === 'home' && !questionnaireCompleted && (
-            <motion.div
-              key="home"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.5 }}
-            >
-              <HomePage startCareerPlanning={startCareerPlanning} />
-            </motion.div>
-          )}
-          {['q1', 'q2', 'q3', 'q4'].includes(currentStep) && (
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 100 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              transition={{ duration: 0.5 }}
-              className="bg-white rounded-lg shadow-lg p-8"
-            >
-              {currentStep === 'q1' && <Question1 onNext={handleNext} previousAnswers={answers} />}
-              {currentStep === 'q2' && <Question2 onNext={handleNext} previousAnswers={answers} />}
-              {currentStep === 'q3' && <Question3 onNext={handleNext} previousAnswers={answers} />}
-              {currentStep === 'q4' && <Question4 onNext={handleNext} previousAnswers={answers} />}
-            </motion.div>
-          )}
-          {questionnaireCompleted && currentStep === 'home' && (
-            <CareerCompass
-              userId={user.id}
-              planCreationStatus={planCreationStatus}
-              onRequestPlan={requestCareerPlan}
-            />
-          )}
-        </AnimatePresence>
+  
+        {currentStep !== 'home' && (
+          <motion.button
+            className="absolute top-4 left-4 bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors"
+            onClick={handleBack}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Back
+          </motion.button>
+        )}
+  
+        <div className="max-w-4xl mx-auto mt-16">
+          <AnimatePresence mode="wait">
+            {currentStep === 'home' && !questionnaireCompleted && !hasSeenIntro && (
+              <motion.div
+                key="intro"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5 }}
+              >
+                <CareerCompassIntro onStart={startQuestionnaire} />
+              </motion.div>
+            )}
+            {currentStep === 'home' && !questionnaireCompleted && hasSeenIntro && (
+              <motion.div
+                key="home"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5 }}
+              >
+                <HomePage startCareerPlanning={startCareerPlanning} />
+              </motion.div>
+            )}
+            {['q1', 'q2', 'q3', 'q4'].includes(currentStep) && (
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, x: 100 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -100 }}
+                transition={{ duration: 0.5 }}
+                className="bg-white rounded-lg shadow-lg p-8"
+              >
+                {currentStep === 'q1' && <Question1 onNext={handleNext} previousAnswers={answers} />}
+                {currentStep === 'q2' && <Question2 onNext={handleNext} previousAnswers={answers} />}
+                {currentStep === 'q3' && <Question3 onNext={handleNext} previousAnswers={answers} />}
+                {currentStep === 'q4' && <Question4 onNext={handleNext} previousAnswers={answers} />}
+              </motion.div>
+            )}
+            {questionnaireCompleted && currentStep === 'home' && (
+              <CareerCompass
+                userId={user.id}
+                planCreationStatus={planCreationStatus}
+                onRequestPlan={requestCareerPlan}
+              />
+            )}
+          </AnimatePresence>
+        </div>
       </div>
-    </div>
-  );
-};
-
-export default App;
+    );
+  };
+  
+  export default App;
