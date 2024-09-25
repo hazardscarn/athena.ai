@@ -37,16 +37,16 @@ const JakeChatbot = () => {
         
         conversationHistory.push({ role: 'user', content: input });
         
-        const response = await fetch('http://localhost:5000/api/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            message: input,
-            conversation_history: conversationHistory
-          }),
-        });
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/chat`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              message: input,
+              conversation_history: conversationHistory
+            }),
+          });
         
         const data = await response.json();
         const botMessage = { text: data.response, sender: 'jake' };
