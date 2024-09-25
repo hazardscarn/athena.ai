@@ -18,7 +18,11 @@ from chatbot import CourseRecommendationChatbot
 
 load_dotenv()
 app = Flask(__name__)
-CORS(app, origins=[os.environ.get('REACT_APP_FRONTEND_URL')])
+frontend_url = os.environ.get('REACT_APP_FRONTEND_URL')
+if frontend_url:
+    CORS(app, origins=[frontend_url])
+else:
+    CORS(app)  # This allows all origins - use only for development/testing
 
 # Initialize the planner agent
 try:
