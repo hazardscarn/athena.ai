@@ -18,9 +18,10 @@ from chatbot import CourseRecommendationChatbot
 
 load_dotenv()
 app = Flask(__name__)
-frontend_url = os.environ.get('REACT_APP_FRONTEND_URL')
+# Update CORS configuration
+frontend_url = os.environ.get('ALLOWED_ORIGIN')
 if frontend_url:
-    CORS(app, origins=[frontend_url])
+    CORS(app, resources={r"/*": {"origins": frontend_url}})
 else:
     CORS(app)  # This allows all origins - use only for development/testing
 
@@ -47,8 +48,11 @@ except Exception as e:
 
 
 
-@app.route('/generate_plan', methods=['POST'])
+@app.route('/generate_plan', methods=['POST', 'OPTIONS'])
 def generate_plan():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     user_id = request.json.get('user_id')
     if not user_id:
         return jsonify({"error": "User ID is required"}), 400
@@ -84,8 +88,10 @@ def generate_plan():
 
 
 
-@app.route('/api/chat', methods=['POST'])
+@app.route('/api/chat', methods=['POST', 'OPTIONS'])
 def chat():
+    if request.method == 'OPTIONS':
+        return '', 204
     data = request.json
     query = data.get('message')
     conversation_history = data.get('conversation_history', [])
@@ -100,7 +106,14 @@ def chat():
         return jsonify({"error": str(e)}), 500
 
 
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', os.environ.get('ALLOWED_ORIGIN', '*'))
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False)
