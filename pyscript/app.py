@@ -84,12 +84,13 @@ def generate_plan():
 def chat():
     data = request.json
     query = data.get('message')
+    conversation_history = data.get('conversation_history', [])
     
     if not query:
         return jsonify({"error": "No message provided"}), 400
 
     try:
-        response = chatbot.get_answer(query)
+        response = chatbot.get_answer(query, conversation_history)
         return jsonify({"response": response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

@@ -16,6 +16,7 @@ class AgentState(TypedDict):
     query: str
     contexts: List[Dict]
     final_answer: str
+    conversation_history: List[Dict]
 
 class CourseRecommendationChatbot:
     def __init__(self):
@@ -82,6 +83,9 @@ class CourseRecommendationChatbot:
 
         prompt_template = """You are a helpful assistant in career trajectory assistance. Use the following information to answer the user's query.
 
+        Conversation History (Last 10 interactions):
+        {conversation_history}
+
         Course Recommendations:
         {course_recommendations}
 
@@ -96,7 +100,10 @@ class CourseRecommendationChatbot:
            - Duration: X hours
            - Difficulty: Easy/Medium/Hard
 
-        If no course recommendations are available, use the web search results to provide a helpful answer.
+        - If no course recommendations are available, use the web search results to provide a helpful answer.
+        - Do not mention that the information is from a web search. Always maintain a friendly and helpful tone.
+        - If the information is from a web search, mention it in a conversational way. Do not say "I found this on the web."
+        - Consider the conversation history when formulating your response. Refer back to previous interactions if relevant.
 
         Always maintain a friendly and helpful tone. If you can't find a direct answer, provide related information or suggestions for further research.
 
@@ -105,12 +112,13 @@ class CourseRecommendationChatbot:
 
         PROMPT = PromptTemplate(
             template=prompt_template,
-            input_variables=["course_recommendations", "web_search_results", "query"]
+            input_variables=["conversation_history", "course_recommendations", "web_search_results", "query"]
         )
 
         chain = PROMPT | self.llm
 
         response = chain.invoke({
+            "conversation_history": json.dumps(state["conversation_history"][-10:]),
             "course_recommendations": json.dumps(course_recommendations["content"] if course_recommendations else []),
             "web_search_results": web_search_results["content"] if web_search_results else "",
             "query": state["query"]
@@ -119,10 +127,12 @@ class CourseRecommendationChatbot:
         state["final_answer"] = response.content if hasattr(response, 'content') else str(response)
         return state
 
-    def get_answer(self, query: str) -> str:
-        initial_state = AgentState(query=query, contexts=[], final_answer="")
+    def get_answer(self, query: str, conversation_history: List[Dict]) -> str:
+        initial_state = AgentState(
+            query=query, 
+            contexts=[], 
+            final_answer="", 
+            conversation_history=conversation_history[-10:]  # Limit to last 10 interactions
+        )
         result = self.agent.invoke(initial_state)
         return result["final_answer"]
-
-
-

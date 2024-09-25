@@ -24,27 +24,43 @@ const JakeChatbot = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (input.trim()) {
-      setMessages([...messages, { text: input, sender: 'user' }]);
+      const userMessage = { text: input, sender: 'user' };
+      setMessages(prevMessages => [...prevMessages, userMessage]);
       setInput('');
       setIsProcessing(true);
+      
       try {
+        const conversationHistory = messages.slice(-9).map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text
+        }));
+        
+        conversationHistory.push({ role: 'user', content: input });
+        
         const response = await fetch('http://localhost:5000/api/chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ message: input }),
+          body: JSON.stringify({ 
+            message: input,
+            conversation_history: conversationHistory
+          }),
         });
+        
         const data = await response.json();
-        setMessages(prevMessages => [...prevMessages, { text: data.response, sender: 'jake' }]);
+        const botMessage = { text: data.response, sender: 'jake' };
+        setMessages(prevMessages => [...prevMessages, botMessage].slice(-20));
       } catch (error) {
         console.error('Error:', error);
-        setMessages(prevMessages => [...prevMessages, { text: "Sorry, I couldn't process your request. Please try again later.", sender: 'jake' }]);
+        const errorMessage = { text: "Sorry, I couldn't process your request. Please try again later.", sender: 'jake' };
+        setMessages(prevMessages => [...prevMessages, errorMessage].slice(-20));
       } finally {
         setIsProcessing(false);
       }
     }
   };
+
 
   const renderMessage = (message, index) => {
     const isUser = message.sender === 'user';
