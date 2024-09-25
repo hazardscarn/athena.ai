@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import traceback
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -54,13 +55,27 @@ def generate_plan():
         return jsonify({"error": "User ID is required"}), 400
 
     try:
+        start_time = time.time()
+        # Log the start of the process
+        app.logger.info(f"Starting plan generation for user {user_id}")
         user_info = get_user_info(_conn, user_id)
+
+        # Log after fetching user info
+        app.logger.info(f"Fetched user info for {user_id} in {time.time() - start_time:.2f} seconds")
+
         resume_content = extract_file_content(user_info['resume'])
+        
+        # Log after extracting resume content
+        app.logger.info(f"Extracted resume content for {user_id} in {time.time() - start_time:.2f} seconds")
 
         themes_df, tasks_df = planner.generate_plan(user_info, resume_content)
 
-        print(themes_df)
-        print(tasks_df)
+        # Log after generating plan
+        app.logger.info(f"Generated plan for {user_id} in {time.time() - start_time:.2f} seconds")
+
+
+        # print(themes_df)
+        # print(tasks_df)
 
         themes_data = themes_df.to_dict('records')[0]
         themes_data['user_id'] = user_id
@@ -74,6 +89,9 @@ def generate_plan():
             # Ensure task_number is float when inserting
             task['task_number'] = float(task['task_number'])
             _conn.table('user_plan_taskoutline').insert(task).execute()
+        
+        # Log completion
+        app.logger.info(f"Completed plan generation and storage for {user_id} in {time.time() - start_time:.2f} seconds")
 
         return jsonify({"message": "Plan generated and stored successfully"}), 200
 
