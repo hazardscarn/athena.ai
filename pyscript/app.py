@@ -19,11 +19,7 @@ from chatbot import CourseRecommendationChatbot
 load_dotenv()
 app = Flask(__name__)
 # Update CORS configuration
-frontend_url = os.environ.get('ALLOWED_ORIGIN')
-if frontend_url:
-    CORS(app, resources={r"/*": {"origins": frontend_url}})
-else:
-    CORS(app)  # This allows all origins - use only for development/testing
+CORS(app, resources={r"/*": {"origins": os.environ.get('ALLOWED_ORIGIN', '*')}})
 
 # Initialize the planner agent
 try:
@@ -82,9 +78,8 @@ def generate_plan():
         return jsonify({"message": "Plan generated and stored successfully"}), 200
 
     except Exception as e:
-        logging.error(f"Error in generate_plan: {str(e)}")
-        logging.error(traceback.format_exc())
-        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+        app.logger.error(f"Error in generate_plan: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 
 

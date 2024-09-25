@@ -329,25 +329,52 @@ const App = () => {
       setCurrentStep(prevStep);
     };
   
+    // const requestCareerPlan = async () => {
+    //   try {
+    //     console.log("Requesting career plan...");
+    //     setPlanCreationStatus('loading');
+    //     const response = await fetch(`${process.env.REACT_APP_API_URL}/generate_plan`, {
+    //       method: 'POST',
+    //       headers: { 'Content-Type': 'application/json' },
+    //       body: JSON.stringify({ user_id: user.id }),
+    //     });
+    //     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    //     console.log("Career plan request successful");
+    //     checkPlanStatus();
+    //   } catch (err) {
+    //     console.error("Error requesting career plan:", err);
+    //     setError(err.message);
+    //     setPlanCreationStatus('error');
+    //   }
+    // };
+    
     const requestCareerPlan = async () => {
       try {
         console.log("Requesting career plan...");
         setPlanCreationStatus('loading');
         const response = await fetch(`${process.env.REACT_APP_API_URL}/generate_plan`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Origin': 'https://athena-ai-0oc2.onrender.com'
+          },
           body: JSON.stringify({ user_id: user.id }),
         });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        console.log("Career plan request successful");
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log("Career plan request successful", data);
         checkPlanStatus();
       } catch (err) {
         console.error("Error requesting career plan:", err);
-        setError(err.message);
+        setError(`Failed to fetch career plan: ${err.message}`);
         setPlanCreationStatus('error');
       }
     };
-    
+
+
     const checkPlanStatus = async () => {
       try {
         console.log("Checking plan status...");
