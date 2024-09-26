@@ -14,7 +14,7 @@ const CareerCompass = ({ userId, planCreationStatus, onRequestPlan }) => {
       transition={{ duration: 0.5 }}
       className="bg-white rounded-lg shadow-lg p-8 text-center"
     >
-      <h2 className="text-3xl font-bold mb-6 text-indigo-700">Career Compass AI</h2>
+      {/* <h2 className="text-3xl font-bold mb-6 text-indigo-700">Career Compass AI</h2> */}
       
       {planCreationStatus === 'idle' && (
         <>

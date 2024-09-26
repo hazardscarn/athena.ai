@@ -275,7 +275,7 @@ const CareerPlanDisplay = ({ userId }) => {
 
   return (
     <div className="max-w-4xl mx-auto bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-2xl p-4 sm:p-8">
-      <h2 className="text-4xl font-bold text-center text-white mb-6">Career Compass</h2>
+      <h2 className="text-4xl font-bold text-center text-white mb-6">Career Compass AI</h2>
       <div className="flex flex-wrap justify-center mb-6 gap-2">
         {Object.keys(themes).filter(key => key.startsWith('month_')).map((month, index) => (
           <motion.button
