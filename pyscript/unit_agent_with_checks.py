@@ -209,6 +209,7 @@ class PlanningAgent:
         3. Are the tasks unique and not repetitive compared to previous months?
         4. Do the tasks provide a good mix of skill development, practical application, and career advancement?
         5. Is there a clear progression from previous months' plans?
+        6. Is there atleast one task added for the months theme?
         
         Respond with a JSON object in this format:
         {{
