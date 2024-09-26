@@ -8,7 +8,12 @@ import traceback
 import time
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)  # Set root logger to INFO level
+
+# Disable debug logs for specific libraries
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("hpack").setLevel(logging.WARNING)
 
 # Add the directory containing utils.py to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -26,24 +31,22 @@ CORS(app, resources={r"/*": {"origins": os.environ.get('ALLOWED_ORIGIN', '*')}})
 try:
     planner = PlanningAgent()
 except Exception as e:
-    logging.error(f"Error initializing PlanningAgent: {str(e)}")
+    app.logger.error(f"Error initializing PlanningAgent: {str(e)}")
     raise
 
 # Initialize the connection to the database
 try:
     _conn = init_connection()
 except Exception as e:
-    logging.error(f"Error initializing database connection: {str(e)}")
+    app.logger.error(f"Error initializing database connection: {str(e)}")
     raise
 
 # Initialize the chatbot
 try:
     chatbot = CourseRecommendationChatbot()
 except Exception as e:
-    logging.error(f"Error initializing CourseRecommendationChatbot: {str(e)}")
+    app.logger.error(f"Error initializing CourseRecommendationChatbot: {str(e)}")
     raise
-
-
 
 @app.route('/generate_plan', methods=['POST', 'OPTIONS'])
 def generate_plan():
@@ -73,19 +76,14 @@ def generate_plan():
         # Log after generating plan
         app.logger.info(f"Generated plan for {user_id} in {time.time() - start_time:.2f} seconds")
 
-
-        # print(themes_df)
-        # print(tasks_df)
-
         themes_data = themes_df.to_dict('records')[0]
         themes_data['user_id'] = user_id
         _conn.table('user_plan_theme').insert(themes_data).execute()
 
-        #tasks_df.to_csv('tasks_sample.csv', index=False)
         tasks_data = tasks_df.to_dict('records')
         for task in tasks_data:
             task['user_id'] = user_id
-            task['status']=0
+            task['status'] = 0
             # Ensure task_number is float when inserting
             task['task_number'] = float(task['task_number'])
             _conn.table('user_plan_taskoutline').insert(task).execute()
@@ -98,8 +96,6 @@ def generate_plan():
     except Exception as e:
         app.logger.error(f"Error in generate_plan: {str(e)}")
         return jsonify({"error": str(e)}), 500
-
-
 
 @app.route('/api/chat', methods=['POST', 'OPTIONS'])
 def chat():
@@ -118,14 +114,12 @@ def chat():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', os.environ.get('ALLOWED_ORIGIN', '*'))
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     return response
-
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

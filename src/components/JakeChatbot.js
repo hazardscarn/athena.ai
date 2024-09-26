@@ -120,7 +120,7 @@ const JakeChatbot = () => {
 
   return (
     <motion.div
-      className="fixed bottom-4 right-4 z-50"
+      className="fixed bottom-4 right-4 z-50 sm:bottom-8 sm:right-8"
       animate={{ y: isOpen ? 0 : 10 }}
     >
       <AnimatePresence>
@@ -129,15 +129,18 @@ const JakeChatbot = () => {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className="bg-white rounded-lg shadow-xl w-[32rem] mb-4 overflow-hidden"
+            className="bg-white rounded-lg shadow-xl w-80 sm:w-96 mb-4 overflow-hidden"
           >
             <div className="bg-indigo-600 text-white p-4 flex justify-between items-center">
-              <h3 className="font-bold text-lg">Jake is online to assist you</h3>
+              <h3 className="font-bold text-lg flex items-center">
+                <span className="w-3 h-3 bg-green-400 rounded-full mr-2"></span>
+                Jake is online to assist you
+              </h3>
               <button onClick={toggleMinimize} className="text-white hover:text-indigo-200">
                 <ChevronDown size={24} />
               </button>
             </div>
-            <div className="h-96 overflow-y-auto p-4 bg-gray-100">
+            <div className="h-64 sm:h-80 overflow-y-auto p-4 bg-gray-100">
               {messages.map(renderMessage)}
               {isProcessing && (
                 <div className="flex justify-center items-center py-2">
