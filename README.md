@@ -1,70 +1,115 @@
-# Getting Started with Create React App
+# Athena AI
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Athena AI (also known as Career Compass AI) is an innovative application that leverages Google's Gemini AI to create personalized, 12-month career roadmaps tailored to your unique goals and challenges. With an interactive dashboard and an AI assistant named Jake, it provides continuous support and guidance for your professional growth journey.
 
-## Available Scripts
+## Table of Contents
+- [Features](#features)
+- [Technologies Used](#technologies-used)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+- [Usage](#usage)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
 
-In the project directory, you can run:
+## Features
 
-### `npm start`
+- Personalized 12-month career development plans
+- Monthly themes with specific, actionable tasks
+- Progress tracking and visualization
+- 24/7 AI-powered career assistant (Jake) for ongoing support
+- Course recommendations
+- User authentication and data security
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Technologies Used
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- Frontend: React.js, Tailwind CSS
+- Backend: Python, Flask
+- AI: Google's Gemini AI
+- Database: Supabase
+- Authentication: Supabase Auth
+- State Management: LangGraph
+- APIs: Various for enhanced AI capabilities
 
-### `npm test`
+## Getting Started
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Prerequisites
 
-### `npm run build`
+- Node.js (v14 or later)
+- Python (v3.8 or later)
+- Supabase account
+- Google Cloud account (for Gemini AI access)
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Installation
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+1. Clone the repository:
+   ```
+   git clone https://github.com/hazardscarn/athena.ai.git
+   cd athena.ai
+   ```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+2. Install frontend dependencies:
+   ```
+   npm install
+   ```
 
-### `npm run eject`
+3. Install backend dependencies:
+   ```
+   cd pyscript
+   pip install -r requirements.txt
+   ```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+4. Set up environment variables:
+   - Create a `.env` file in the root directory and a `.env` file in the `pyscript` directory
+   - Add the following variables (replace with your actual values):
+     ```
+     # Root .env
+     REACT_APP_SUPABASE_URL=your_supabase_url
+     REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
+     SUPABASE_SECRET_KEY='your supabase secret key'
+     GOOGLE_API_KEY="google api key"
+     REACT_APP_API_URL=http://127.0.0.1:5000
+     ```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+5. Start the backend server:
+   ```
+   cd pyscript
+   python app.py
+   ```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+6. In a new terminal, start the frontend development server:
+   ```
+   npm start
+   ```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+7. Open your browser and navigate to `http://localhost:3000`
 
-## Learn More
+## Usage
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+1. Sign up for an account or log in if you already have one.
+2. Complete the initial questionnaire to provide information about your current career status and goals.
+3. Review your personalized 12-month career plan.
+4. Track your progress and complete tasks for each month.
+5. Use the AI assistant Jake for any career-related questions or guidance.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Contributing
 
-### Code Splitting
+We welcome contributions to Athena AI! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Support
 
-### Analyzing the Bundle Size
+For any suggestions, queries, or support needs, please contact: David
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Email: davidacad10@gmail.com 
+LinkedIn: https://www.linkedin.com/in/david-babu-15047096/
 
-### Making a Progressive Web App
+## License
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+This project is licensed under the Apache License - see the [LICENSE.md](LICENSE.md) file for details.
 
-### Advanced Configuration
+## Acknowledgments
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- Google for providing the Gemini AI API
+- Supabase for their excellent database and authentication services
+- All contributors and supporters of the project
